@@ -20,6 +20,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
+
 SYSTEM_PROMPT = """
 Ти — AI-помічник у Telegram-боті студента.
 
@@ -40,12 +41,21 @@ SYSTEM_PROMPT = """
 Якщо користувач ставить технічне питання, пояснюй матеріал послідовно і зрозуміло.
 """
 
+
 def get_main_menu():
     keyboard = [
         [InlineKeyboardButton("Студент", callback_data="student")],
         [InlineKeyboardButton("IT-технології", callback_data="technologies")],
         [InlineKeyboardButton("Контакти", callback_data="contacts")],
         [InlineKeyboardButton("Prompt AI", callback_data="prompt_ai")],
+    ]
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_back_button():
+    keyboard = [
+        [InlineKeyboardButton("Назад", callback_data="back")]
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -61,18 +71,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
     query = update.callback_query
 
     await query.answer()
 
-    if query.data == "student":
+    if query.data == "back":
+        context.user_data["waiting_for_ai"] = False
+
+        await query.edit_message_text(
+            "Оберіть потрібний пункт меню:",
+            reply_markup=get_main_menu(),
+        )
+
+    elif query.data == "student":
         context.user_data["waiting_for_ai"] = False
 
         await query.edit_message_text(
             "Студентка: Войтюк А.С.\n"
             "Група: ІП-32",
-            reply_markup=get_main_menu(),
+            reply_markup=get_back_button(),
         )
 
     elif query.data == "technologies":
@@ -85,8 +106,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• JavaScript\n"
             "• SQL / NoSQL\n"
             "• Git\n"
-            "• Unity\n",
-            reply_markup=get_main_menu(),
+            "• Unity",
+            reply_markup=get_back_button(),
         )
 
     elif query.data == "contacts":
@@ -96,7 +117,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Контакти:\n\n"
             "Телефон: +380 66 466 58 46\n"
             "E-mail: voitiuk.anastasiia_ip32@edu.kpi.ua",
-            reply_markup=get_main_menu(),
+            reply_markup=get_back_button(),
         )
 
     elif query.data == "prompt_ai":
@@ -128,21 +149,25 @@ async def ai_message_handler(
 
     try:
         response = gemini_client.models.generate_content(
-            model="gemini-3.1-flash-lite",
+            model="gemini-3.6-flash",
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
             ),
         )
 
-        await update.message.reply_text(response.text)
+        await update.message.reply_text(
+            response.text,
+            reply_markup=get_main_menu(),
+        )
 
     except Exception as error:
         print(f"Gemini API error: {error}")
 
         await update.message.reply_text(
             "Виникла помилка під час звернення до Gemini. "
-            "Спробуйте ще раз."
+            "Спробуйте ще раз.",
+            reply_markup=get_main_menu(),
         )
 
 
@@ -183,4 +208,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
