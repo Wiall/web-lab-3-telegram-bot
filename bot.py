@@ -42,6 +42,14 @@ SYSTEM_PROMPT = """
 """
 
 
+GEMINI_MODELS = [
+    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.6-flash",
+]
+
 def get_main_menu():
     keyboard = [
         [InlineKeyboardButton("Студент", callback_data="student")],
@@ -132,6 +140,33 @@ async def button_handler(
         )
 
 
+def generate_ai_response(user_prompt):
+    last_error = None
+
+    for model in GEMINI_MODELS:
+        try:
+            response = gemini_client.models.generate_content(
+                model=model,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                ),
+            )
+
+            return response.text
+
+        except Exception as error:
+            last_error = error
+
+            if "503" in str(error):
+                print(f"Модель {model} недоступна, пробуємо наступну...")
+                continue
+
+            raise
+
+    raise last_error
+
+
 async def ai_message_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
@@ -148,16 +183,10 @@ async def ai_message_handler(
     )
 
     try:
-        response = gemini_client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=user_prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-            ),
-        )
+        answer = generate_ai_response(user_prompt)
 
         await update.message.reply_text(
-            response.text,
+            answer,
             reply_markup=get_main_menu(),
         )
 
